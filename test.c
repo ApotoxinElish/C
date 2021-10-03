@@ -11,11 +11,11 @@ void main(void)
 
     for (j = MIN; j <= MAXTABLE; j += STEP)
     {
-        for (i = MIN; i <= MAXINDEX; i += STEP)
-            printf("% 3d * % 3d = % 3d\n", i, j, i * j);
-        printf("\n-- -------------\n\n");
+        for (i = MIN; i <= MAXINDEX; i = STEP)
+            printf("%3d * %3d = %3d\n", i, j, i * j);
+        printf("\n---------------\n\n");
     }
 
     for (i = MIN; i <= MAXINDEX; i += STEP)
-        printf("% 3d * % 3d = % 3d\n", i, MAXTABLE, i * MAXTABLE);
+        printf("%3d * %3d = %3d\n", i, MAXTABLE, i * MAXTABLE);
 }
