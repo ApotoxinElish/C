@@ -1,20 +1,11 @@
 body {
-  background: rgb(58, 58, 58);
-  color: white;
-  font-family: Helvetica Neue, Helvetica, Arial, sans-serif;
+  background-color: #d0e4fe;
 }
-
 h1 {
-  background: black;
-  color: rgb(0, 183, 255);
+  color: orange;
+  text-align: center;
 }
-
-h2 {
-  color: rgb(158, 158, 158);
-}
-
-button {
-  background: gray;
-  border: none;
-  color: white;
+p {
+  font-family: "Times New Roman";
+  font-size: 20px;
 }
