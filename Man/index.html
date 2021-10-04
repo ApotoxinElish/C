@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <title>Let's learn multiplication table</title>
+
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+
+  <body>
+    <section id="mainMenu">
+      <section class="row">
+        <section class="column">
+          <h2>Let's learn multiplication table</h2>
+
+          <img src="boy.png" width="500" height="500" />
+        </section>
+
+        <section class="column">
+          <button class="mainMenuButton" id="seeButton" onclick="swap(1)">
+            have a look at multiplication table
+          </button>
+
+          <button class="mainMenuButton" id="memorizeButton" onclick="swap(2)">
+            start to memorize
+          </button>
+
+          <button class="mainMenuButton" id="gameButton" onclick="swap(3)">
+            play multiplication table game
+          </button>
+
+          <button class="mainMenuButton" id="recordButton" onclick="swap(4)">
+            record
+          </button>
+        </section>
+      </section>
+    </section>
+
+    <section id="children" style="display: none">
+      <section class="column">
+        <section class="row">
+          <button class="backButton" onclick="back()">back</button>
+
+          <h1>title</h1>
+        </section>
+
+        <section class="row">
+          <table id="MT"></table>
+
+          <section class="column">
+            <form id="answer">
+              <label id="formula">Answer</label><br />
+
+              <input type="text" />
+            </form>
+
+            <button id="submitButton" onclick="submit()">submit</button>
+          </section>
+        </section>
+      </section>
+    </section>
+
+    <section id="parents" style="display: none">
+      <section class="column">
+        <section class="row">
+          <button class="backButton" onclick="back()">back</button>
+
+          <h1>title</h1>
+
+          <button>delete record</button>
+        </section>
+
+        <table id="record">
+          <th>
+            <tr>
+              time
+            </tr>
+
+            <tr>
+              mode
+            </tr>
+
+            <tr>
+              degree of completion
+            </tr>
+
+            <tr>
+              duration
+            </tr>
+          </th>
+        </table>
+      </section>
+    </section>
+
+    <script src="main.js"></script>
+  </body>
+</html>

@@ -1,0 +1,510 @@
+<template>
+  <div
+    id="app"
+    :class="{
+			teacher: ui === 'teacher',
+			children: ui === 'children',
+			parent: ui === 'parent'
+		}"
+  >
+    <div id="diff">
+      <button @click="diff++">{{ diff % 3 }}</button>
+      <span id="expand">Difficulty</span>
+    </div>
+    <div id="game" v-show="diff % 3 == 2">
+      <div class="row" v-for="row_i in 6">
+        <button
+          v-for="col_i in 6"
+          :class="'col ' + get_class(row_i - 1, col_i - 1)"
+          @click="modify_board(row_i - 1, col_i - 1)"
+        >
+          {{ get_val(row_i - 1, col_i - 1) }}
+        </button>
+      </div>
+      <div id="restart" v-show="nums.every((v, i) => v === board[i])">
+        <div style="color: var(--green)">
+          Congratulations!
+          <br />
+        </div>
+        <button class="col text" @click="init_game()">Restart</button>
+      </div>
+      <div id="selection-board" v-show="!nums.every((v, i) => v === board[i])">
+        <div>
+          <button
+            :class="{
+							active: selected == si,
+							used: si == null ? false : board.includes(si),
+							col: true,
+							btn: true
+						}"
+            v-for="si in ans.slice(0, 5)"
+            @click="selected = si"
+          >
+            {{ si }}
+          </button>
+        </div>
+        <div>
+          <button
+            :class="{
+							active: selected == si,
+							used: si == null ? false : board.includes(si),
+							col: true,
+							btn: true
+						}"
+            v-for="si in ans.slice(5)"
+            @click="selected = si"
+          >
+            {{ si }}
+          </button>
+        </div>
+      </div>
+    </div>
+    <div id="table" v-show="diff % 3 == 1">
+      <div class="row" v-for="r in 10">
+        <button
+          v-for="c in 10"
+          :class="{
+						col: true,
+						num: true,
+						arith: r == 1 || c == 1,
+						pressed: r == 1 || c == 1
+					}"
+          :style="r > 1 && c > 1 && r == c ? 'background-color: var(--pink);' : ''"
+          @click="
+						table[c * 10 + r - 11] = table[r * 10 + c - 11] = !table[r * 10 + c - 11];
+						table = table.slice();
+					"
+        >
+          <span v-if="r == 1 || c == 1">{{ r * c }}</span>
+          <span v-else-if="table[r * 10 + c - 11]">{{ r * c }}</span>
+          <span
+            v-else
+            :style="
+							r == 10 || c == 10
+								? r == 10 && c == 10
+									? 'font-size: .7rem'
+									: 'font-size: .8rem'
+								: 'font-size: 1rem'
+						"
+          >
+            {{ r }} × {{ c }}
+          </span>
+        </button>
+      </div>
+      <button class="col text" @click="table = Array(100).fill(!table[11])">
+        CLEAR
+      </button>
+    </div>
+    <div id="demo" v-show="diff % 3 == 0">
+      <div id="selection-table">
+        <div v-for="ri in 2" class="row">
+          <button
+            :class="{
+							used: demo[ri - 1] == ci,
+							col: true,
+							btn: true
+						}"
+            v-for="ci in 10"
+            @click="demo.splice(ri - 1, 1, ci)"
+          >
+            {{ ci }}
+          </button>
+        </div>
+      </div>
+      <div style="color: white">
+        {{ demo[0] }} × {{ demo[1] }} = {{ demo[0] * demo[1] }}
+      </div>
+      <div id="demo-animation"></div>
+      <div class="outer-ring row" v-if="ui !== 'children'">
+        <div class="inner-ring" v-for="ri in demo[0]">
+          <div class="object" v-for="oi in demo[1]"></div>
+        </div>
+      </div>
+      <div id="rect" v-else>
+        <div class="row" v-for="ri in demo[0]">
+          <div class="col btn" v-for="oi in demo[1]"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script>
+  export default {
+    data() {
+      return {
+        diff: 0,
+        game: {},
+        rows: [],
+        nums: [],
+        arith: [],
+        board: [],
+        ans: [1, 2, 3, 4, 5, 6, 7, 8, 9, null],
+        selected: null,
+        // available 'ui' options:
+        // "children" - child mode, a low-difficulty multiplication table
+        // "teacher" - teacher mode, a medium-difficulty demonstration of multiplying
+        // "parent" - parent mode, a high-difficulty multiplication game
+        ui: "children",
+        table: [],
+        demo: [0, 0],
+      };
+    },
+    methods: {
+      get_val(row_i, col_i) {
+        if (row_i % 2 == 1 && col_i % 2 == 1) return null;
+        if (row_i % 2 == 0 && col_i % 2 == 0)
+          return this.board[(3 * row_i) / 2 + col_i / 2];
+        if (row_i == 5) return this.calc_col(col_i / 2);
+        if (col_i == 5) return this.calc_row(row_i / 2);
+        // return "a";
+        if (row_i % 2 == 0) return this.arith[row_i / 2][(col_i - 1) / 2];
+        else return this.arith[col_i / 2 + 3][(row_i - 1) / 2];
+      },
+      get_class(row_i, col_i) {
+        const get_result_class = (i) => {
+          return i == 0
+            ? "end pressed"
+            : i > 0
+            ? "end pressed right"
+            : "end pressed wrong";
+        };
+        if (col_i == 5 && row_i % 2 == 0)
+          return get_result_class(this.verify_row(row_i / 2));
+        if (row_i == 5 && col_i % 2 == 0)
+          return get_result_class(this.verify_col(col_i / 2));
+        if (col_i % 2 == 0 && row_i % 2 == 0) return "num";
+        if (col_i % 2 ^ row_i % 2) return "arith pressed";
+        return "null";
+      },
+      modify_board(row_i, col_i) {
+        if (row_i % 2 == 0 && col_i % 2 == 0) {
+          this.board[col_i / 2 + (3 * row_i) / 2] = this.selected;
+          this.selected = -1;
+          this.selected = null;
+        }
+      },
+      verify_row(row_i) {
+        if (this.calc_row(row_i, this.board) == null) return 0;
+        else if (this.calc_row(row_i, this.board) == this.calc_row(row_i))
+          return 1;
+        return -1;
+      },
+      verify_col(col_i) {
+        if (this.calc_col(col_i, this.board) == null) return 0;
+        else if (this.calc_col(col_i, this.board) == this.calc_col(col_i))
+          return 1;
+        return -1;
+      },
+      calc_row(row_i, add_nums) {
+        let nums = add_nums || this.nums;
+        return this.calc(
+          nums.slice(3 * row_i, 3 * row_i + 3),
+          this.arith[row_i].slice()
+        );
+      },
+      calc_col(col_i, add_nums) {
+        let nums = add_nums || this.nums;
+        return this.calc(
+          nums.filter((v, i) => i % 3 == col_i),
+          this.arith[col_i + 3].slice()
+        );
+      },
+      calc3(num1, arg, num2) {
+        switch (arg) {
+          case "+":
+            return num1 + num2;
+          case "-":
+            return num1 - num2;
+          case "x":
+            return num1 * num2;
+          default:
+            return null;
+        }
+      },
+      calc(n, a) {
+        if (n === null || a === null) return null;
+        if (n.includes(null)) return null;
+        let result = n.shift();
+        while (n.length && a.length) {
+          result = this.calc3(result, a.shift(), n.shift());
+        }
+        return Number.isInteger(result) ? result : null;
+      },
+      incrs_diff() {
+        this.diff++;
+      },
+      init_game() {
+        // generate a set ranged from 0-9
+        // and then shuffle it
+        this.nums = Array.from({ length: 9 }, (v, k) => k + 1)
+          .map((value) => ({ value, sort: Math.random() }))
+          .sort((a, b) => a.sort - b.sort)
+          .map(({ value }) => value);
+
+        // generate the arithmetic functions
+        // 3 horizontal, and then 3 vertical
+        for (var i = 0; i < 6; i++) {
+          // make sure that there is a 1/2 chance of 'x' exists
+          this.arith.push([
+            Math.round(Math.random()) ? "x" : "+",
+            Math.round(Math.random()) ? "+" : "-",
+          ]);
+        }
+        console.log(this.nums);
+
+        this.board = Array(9).fill(null);
+      },
+      init_table() {
+        this.table = Array(100).fill(false);
+      },
+    },
+    created() {
+      this.init_game();
+      this.init_table();
+    },
+  };
+</script>
+
+<!-- Use preprocessors via the lang attribute! e.g. <style lang="scss"> -->
+<style lang="scss">
+  body {
+    --black: #403f4c;
+    --pink: #efbcd5;
+    --blue: #3185fc;
+    --yellow: #f9dc5c;
+    --red: #e84855;
+    --green: #adc698;
+    background-color: var(--black);
+    color: var(--black);
+    button {
+      border: none;
+      background-color: transparent;
+      font: inherit;
+    }
+  }
+  #app {
+    // global stylesheet
+    // for every mode
+    font-family: "Baloo", cursive !important;
+    font-size: 2rem;
+    color: var(--black);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    flex-direction: column;
+    text-align: center;
+    .row {
+      display: flex;
+    }
+    .col {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 3rem;
+      height: 3.7rem;
+      margin: 0.5rem;
+      border-radius: 20%;
+      &.btn {
+        background: var(--yellow);
+        color: var(--black);
+      }
+      &:not(.null) {
+        border: none;
+        border-bottom: inset 0.2rem rgba(0, 0, 0, 0.2);
+        // some coloring
+        &.num {
+          background: var(--yellow);
+          color: var(--black);
+        }
+        &.arith {
+          background: var(--blue);
+          color: white;
+        }
+        &.end {
+          background-color: var(--pink) !important;
+          color: var(--black) !important;
+        }
+        &.text {
+          background: var(--yellow);
+          color: var(--black);
+          width: 100%;
+          border-radius: 1rem;
+        }
+        &.pressed,
+        &.used,
+        &:not(.null):not(.end):active,
+        &:not(.null):not(.end).active {
+          height: 3.6rem;
+          border-top: inset 0.2rem rgba(0, 0, 0, 0.1);
+          border-bottom: none;
+          transform: translateY(0.2rem);
+        }
+        &.active {
+          @keyframes cur_selected {
+            0% {
+              background-color: var(--yellow);
+            }
+            50% {
+              background-color: var(--blue);
+            }
+          }
+          animation: cur_selected 2s infinite;
+        }
+        &.used {
+          filter: brightness(50%);
+        }
+      }
+      &.end.wrong {
+        background-color: var(--red) !important;
+      }
+      &.end.right {
+        background-color: var(--green) !important;
+      }
+    }
+    > * {
+      transition: ease all 1s;
+    }
+    #game {
+      // game style sheet
+      #selection-board,
+      #restart {
+        margin-top: 4rem;
+      }
+      #selection-board > * {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+    }
+    #diff {
+      z-index: 99999;
+      &,
+      & > * {
+        height: 3rem;
+        border-radius: 1rem;
+        background-color: var(--green);
+      }
+      button {
+        top: 20px;
+        right: 20px;
+        width: 2rem;
+        position: fixed;
+        z-index: 9999;
+        color: white;
+        filter: opacity(90%) brightness(80%);
+      }
+      #expand {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+
+        filter: opacity(90%) brightness(80%);
+        max-width: 0.5rem;
+        color: transparent;
+
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 0 3rem 0 1rem;
+        z-index: 2;
+        opacity: 0;
+        transition: ease all 0.8s;
+        z-index: 999;
+      }
+      button:hover {
+        filter: none;
+      }
+      button:hover + #expand {
+        max-width: 10rem;
+        height: 3rem;
+        color: var(--black);
+        font-size: 2rem;
+        right: 20px;
+        top: 20px;
+        opacity: 1;
+      }
+    }
+    #table {
+      .row:nth-child(10) .col:nth-child(10) {
+        font-size: 1.5rem;
+      }
+    }
+    #demo {
+      #demo-animation {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .outer-ring,
+      .inner-ring,
+      .object {
+        border-radius: 50%;
+      }
+      .inner-ring,
+      .object {
+        position: absolute;
+        left: calc(50% - 4.4rem);
+        top: 50%;
+      }
+      .outer-ring {
+        margin-top: 32rem;
+        width: 32rem;
+        height: 32rem;
+        @for $i from 1 through 10 {
+          & .inner-ring:nth-child(#{$i}) {
+            transform: rotate(36deg * $i) translate(16rem);
+          }
+        }
+      }
+      .inner-ring {
+        width: 8rem;
+        height: 8rem;
+        & .object {
+          width: 0.8rem;
+          height: 0.8rem;
+          background-color: var(--pink);
+        }
+        @for $j from 1 through 10 {
+          & .object:nth-child(#{$j}) {
+            transform: rotate(36deg * $j) translate(2.4rem);
+          }
+        }
+      }
+    }
+  }
+
+  .children {
+    $animals: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23eaeaea' d='M56.92,48.75l-1.57-5.1A53.24,53.24,0,0,1,53,28h0c0-.72,0-1.44-.11-2.15a20.7,20.7,0,0,0-1-4.61A21.37,21.37,0,0,0,50.47,18a21,21,0,0,0-6.73-7.4c-.56-.38-1.13-.73-1.73-1.06a21.08,21.08,0,0,0-20,0c-.6.33-1.17.68-1.73,1.06a20.66,20.66,0,0,0-3.11,2.56,20.93,20.93,0,0,0-4.5,6.68,20.51,20.51,0,0,0-1.54,6C11,26.56,11,27.28,11,28h0A53.24,53.24,0,0,1,8.65,43.65l-1.57,5.1a1.81,1.81,0,0,0-.08.51H7A1.74,1.74,0,0,0,8.74,51H11a6,6,0,0,0,5.65-4A5.8,5.8,0,0,0,17,45v6a3,3,0,0,0,2.92,3A7,7,0,0,0,27,47v4.78A5.16,5.16,0,0,0,31.51,57,5,5,0,0,0,37,52V47a7,7,0,0,0,7.08,7A3,3,0,0,0,47,51V45a5.8,5.8,0,0,0,.35,2A6,6,0,0,0,53,51h2.26A1.74,1.74,0,0,0,57,49.26h0A1.81,1.81,0,0,0,56.92,48.75Z'/%3E%3Cpath fill='%23bd7f00' d='M35,27.46h1.95a1,1,0,0,1,1,1v11a0,0,0,0,1,0,0H27a1,1,0,0,1-1-1v-2A9,9,0,0,1,35,27.46Z' transform='rotate(45 31.983 33.478)'/%3E%3Ccircle cx='43.5' cy='24.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='20.5' cy='24.5' r='1.5' fill='%232d2d2d'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23bd7f00' d='M24.31 12.46A21 21 0 0 0 11 32V7A18.88 18.88 0 0 1 24.31 12.46zM53 7V32A21 21 0 0 0 39.69 12.46 18.88 18.88 0 0 1 53 7z'/%3E%3Cpath fill='%23ffab00' d='M53,32v9A16,16,0,0,1,37,57H27A16,16,0,0,1,11,41V32A21,21,0,0,1,24.31,12.46L25,12.2a18.43,18.43,0,0,1,1.92-.58A21.13,21.13,0,0,1,31,11l1,0,1,0a21.13,21.13,0,0,1,4.08.6A18.43,18.43,0,0,1,39,12.2l.69.26A21,21,0,0,1,53,32Z'/%3E%3Ccircle cx='22.5' cy='30.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='41.5' cy='30.5' r='1.5' fill='%232d2d2d'/%3E%3Cpath fill='%23646467' d='M43 40a1 1 0 0 1-.29-2l13-4A1 1 0 1 1 56.29 36l-13 4A.92.92 0 0 1 43 40zM21 40a.84.84 0 0 1-.27 0l-14-4A1 1 0 1 1 7.27 34l14 4A1 1 0 0 1 21 40zM56 50a.92.92 0 0 1-.29 0l-13-4A1 1 0 0 1 43.29 44l13 4A1 1 0 0 1 56 50zM7 50a1 1 0 0 1-.27-2l14-4A1 1 0 0 1 21.27 46l-14 4A.84.84 0 0 1 7 50zM21 43H7a1 1 0 0 1 0-2H21a1 1 0 0 1 0 2zM57 43H43a1 1 0 0 1 0-2H57a1 1 0 0 1 0 2z'/%3E%3Cpath fill='%23bd7f00' d='M32,48a1,1,0,0,1-1-1V42a1,1,0,0,1,2,0v5A1,1,0,0,1,32,48Z'/%3E%3Cpath fill='%23bd7f00' d='M28.5,52A4.51,4.51,0,0,1,24,47.5a1,1,0,0,1,2,0,2.5,2.5,0,0,0,5,0,1,1,0,0,1,2,0A4.51,4.51,0,0,1,28.5,52Z'/%3E%3Cpath fill='%23bd7f00' d='M35.5 52A4.51 4.51 0 0 1 31 47.5a1 1 0 0 1 2 0 2.5 2.5 0 0 0 5 0 1 1 0 0 1 2 0A4.51 4.51 0 0 1 35.5 52zM27 12v9a1 1 0 0 1-2 0V12.2a18.43 18.43 0 0 1 1.92-.58A1 1 0 0 1 27 12zM33 11V25a1 1 0 0 1-2 0V11l1 0zM39 12.2V21a1 1 0 0 1-2 0V12a1 1 0 0 1 .08-.38A18.43 18.43 0 0 1 39 12.2z'/%3E%3Cpath fill='%233e2c27' d='M32,43h0l-2.23-1.19A1.49,1.49,0,0,1,29,40.48h0A1.43,1.43,0,0,1,30.39,39h3.22A1.43,1.43,0,0,1,35,40.48h0a1.49,1.49,0,0,1-.77,1.33Z'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23edcad4' d='M51,47.5v2A7.5,7.5,0,0,1,43.5,57h-23A7.5,7.5,0,0,1,13,49.5v-2A7.52,7.52,0,0,1,20.5,40h23A7.52,7.52,0,0,1,51,47.5Z'/%3E%3Ccircle cx='23.5' cy='48.5' r='2.5' fill='%239d5b6e'/%3E%3Ccircle cx='40.5' cy='48.5' r='2.5' fill='%239d5b6e'/%3E%3Cpath fill='%23aeadb3' d='M21.5,16l-.18,1.07a14,14,0,0,0-5.18,9.47A10.84,10.84,0,0,1,13,27H7A11,11,0,0,1,18,16Z'/%3E%3Cpath fill='%23aeadb3' d='M21.5 16l-.18 1.07a14 14 0 0 0-5.18 9.47A10.84 10.84 0 0 1 13 27H7A11 11 0 0 1 18 16zM57 27H51a10.84 10.84 0 0 1-3.14-.46 14 14 0 0 0-5.18-9.47L42.5 16H46A11 11 0 0 1 57 27z'/%3E%3Cpath fill='%233e2c27' d='M28.19,14.13A13.9,13.9,0,0,0,22.86,16a13.64,13.64,0,0,0-1.54,1.07L21.5,16l1.17-7a2.36,2.36,0,0,1,4.66,0Z'/%3E%3Cpath fill='%23eaeaea' d='M47.93,28V41.46A7.4,7.4,0,0,0,43.5,40h-23a7.4,7.4,0,0,0-4.43,1.46V28c0-.49,0-1,.07-1.46a14,14,0,0,1,5.18-9.47A13.64,13.64,0,0,1,22.86,16a13.9,13.9,0,0,1,5.33-1.87A12.9,12.9,0,0,1,30.07,14h3.86a12.9,12.9,0,0,1,1.88.13A13.9,13.9,0,0,1,41.14,16a13.64,13.64,0,0,1,1.54,1.07,14,14,0,0,1,5.18,9.47C47.9,27,47.93,27.51,47.93,28Z'/%3E%3Ccircle cx='25.5' cy='29.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='38.5' cy='29.5' r='1.5' fill='%232d2d2d'/%3E%3Cpath fill='%233e2c27' d='M42.68,17.07A13.64,13.64,0,0,0,41.14,16a13.9,13.9,0,0,0-5.33-1.87L36.67,9a2.36,2.36,0,0,1,4.66,0l1.17,7Z'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23965500' d='M25 13v4A12 12 0 0 1 13 29a6 6 0 0 1-6-6V19A12 12 0 0 1 19 7a6 6 0 0 1 5.94 5.21A5.16 5.16 0 0 1 25 13zM57 19v4a6 6 0 0 1-6 6A12 12 0 0 1 39 17V13a5.16 5.16 0 0 1 .06-.79A6 6 0 0 1 45 7 12 12 0 0 1 57 19z'/%3E%3Cpath fill='%23efc589' d='M53,32V49a8,8,0,0,1-8,8H19a8,8,0,0,1-8-8V32a21.84,21.84,0,0,1,.25-3.26A6,6,0,0,0,13,29,12,12,0,0,0,25,17V13a5.16,5.16,0,0,0-.06-.79,21.2,21.2,0,0,1,14.12,0A5.16,5.16,0,0,0,39,13v4A12,12,0,0,0,51,29a6,6,0,0,0,1.75-.26A21.84,21.84,0,0,1,53,32Z'/%3E%3Cpath fill='%23b19267' d='M43,48v3a6,6,0,0,1-6,6H27a6,6,0,0,1-6-6V48a11,11,0,0,1,8-10.58.13.13,0,0,0,0,.06,1.49,1.49,0,0,0,.77,1.33L32,40l2.23-1.19A1.49,1.49,0,0,0,35,37.48a.13.13,0,0,0,0-.06A11,11,0,0,1,43,48Z'/%3E%3Ccircle cx='23.5' cy='29.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='40.5' cy='29.5' r='1.5' fill='%232d2d2d'/%3E%3Cpath fill='%233e2c27' d='M32,52a1,1,0,0,1-1-1V39a1,1,0,0,1,2,0V51A1,1,0,0,1,32,52Z'/%3E%3Cpath fill='%233e2c27' d='M35,37.48a1.49,1.49,0,0,1-.77,1.33L32,40l-2.23-1.19A1.49,1.49,0,0,1,29,37.48a.13.13,0,0,1,0-.06A1.42,1.42,0,0,1,30.39,36h3.22A1.42,1.42,0,0,1,35,37.42.13.13,0,0,1,35,37.48Z'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='27.5' cy='38.5' r='1.5' fill='%232d2d2d'/%3E%3Cpath fill='%2387868a' d='M49,22v7a20,20,0,0,1-.73,5.35l-.15.53-2.69,8.72A2,2,0,0,1,43.52,45H43V43.5a2.5,2.5,0,0,0-5,0V47A12,12,0,0,1,26,59H23a6,6,0,0,1-6-6h3a3,3,0,0,0,6,0V43.5a2.5,2.5,0,1,0-5,0V45h-.52a2,2,0,0,1-1.91-1.41l-2.69-8.72-.15-.53A20,20,0,0,1,15,29V22a17,17,0,0,1,34,0Z'/%3E%3Ccircle cx='42.5' cy='29.38' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='21.5' cy='29.38' r='1.5' fill='%232d2d2d'/%3E%3Cpath fill='%23646467' d='M61 13v7a6.13 6.13 0 0 1-.23 1.64l-2.53 9A6 6 0 0 1 52.46 35H51a6 6 0 0 1-2.73-.66A20 20 0 0 0 49 29V22a16.91 16.91 0 0 0-3.76-10.66A6 6 0 0 1 51 7h4A6 6 0 0 1 61 13zM15 29a20 20 0 0 0 .73 5.35A6 6 0 0 1 13 35H11.54a6 6 0 0 1-5.78-4.37L3.23 21.68A6.13 6.13 0 0 1 3 20V13A6 6 0 0 1 9 7h4a6 6 0 0 1 5.76 4.34A16.91 16.91 0 0 0 15 22z'/%3E%3Cpath fill='%23d8d9dd' d='M43 43.5V51a5 5 0 0 1-5-5V43.5a2.5 2.5 0 1 1 5 0zM26 43.5V46a5 5 0 0 1-5 5V43.5a2.5 2.5 0 0 1 5 0z'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23ffab00' d='M57,35,45.78,28.69A7.23,7.23,0,0,0,35,35V52.48A1.43,1.43,0,0,0,33.61,51H30.39A1.43,1.43,0,0,0,29,52.48V35a7.23,7.23,0,0,0-10.78-6.31L7,35l8-12A20.2,20.2,0,0,1,32,14a20.2,20.2,0,0,1,17,9Z'/%3E%3Cpath fill='%23efc589' d='M57,35l-4,2.08a35.57,35.57,0,0,0-9.25,6.33,18.37,18.37,0,0,0-5,9.57,5,5,0,0,1-4.9,4H30.1a5,5,0,0,1-4.9-4C23.57,44.85,18.35,40.9,11,37.08L7,35l11.22-6.31A7.23,7.23,0,0,1,29,35V52.48A1.43,1.43,0,0,1,30.39,51h3.22A1.43,1.43,0,0,1,35,52.48V35a7.23,7.23,0,0,1,10.78-6.31Z'/%3E%3Cpath fill='%233e2c27' d='M35,52.48a1.49,1.49,0,0,1-.77,1.33L32,55l-2.23-1.19A1.49,1.49,0,0,1,29,52.48,1.43,1.43,0,0,1,30.39,51h3.22A1.43,1.43,0,0,1,35,52.48Z'/%3E%3Cpath fill='%23bd7f00' d='M21.09 17.09A20.12 20.12 0 0 0 15 23l-.52.78A7.69 7.69 0 0 1 11 17.29V7zM53 7V17.29a7.69 7.69 0 0 1-3.5 6.46L49 23a20.12 20.12 0 0 0-6.07-5.88z'/%3E%3Ccircle cx='23.5' cy='35.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='40.5' cy='35.5' r='1.5' fill='%232d2d2d'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23aeadb3' d='M37.52,52.66a14,14,0,0,1-3.64,4.77L32,59l-1.88-1.57a14,14,0,0,1-3.65-4.77,8,8,0,0,0,2.3.34h6.46A7.93,7.93,0,0,0,37.52,52.66Z'/%3E%3Cpath fill='%23d8d9dd' d='M46,30v6.38a10,10,0,0,1-.51,3.16l-2.65,7.93,0,.06A8,8,0,0,1,35.23,53H28.77a8,8,0,0,1-7.59-5.47l0-.06-2.65-7.93A10,10,0,0,1,18,36.38V30a10,10,0,0,1,3-7.14c.2-.19.4-.38.62-.56h0A9.86,9.86,0,0,1,27,20.05c.33,0,.66-.05,1-.05h8c.34,0,.67,0,1,.05a8.83,8.83,0,0,1,1,.16q.31.06.63.15l.12,0a6.17,6.17,0,0,1,.61.19l.25.1a3.74,3.74,0,0,1,.51.22,8.17,8.17,0,0,1,.93.48,3.87,3.87,0,0,1,.43.27,7.67,7.67,0,0,1,.86.64h0c.22.18.42.37.62.56A10,10,0,0,1,46,30Z'/%3E%3Cpath fill='%23464548' d='M53 5.93a.94.94 0 0 1-.53.83A17 17 0 0 0 43.12 20 16.4 16.4 0 0 0 43 22v.86c-.2-.19-.4-.38-.62-.56h0a7.67 7.67 0 0 0-.86-.64 3.87 3.87 0 0 0-.43-.27 8.17 8.17 0 0 0-.93-.48 3.74 3.74 0 0 0-.51-.22l-.25-.1a6.17 6.17 0 0 0-.61-.19l-.12 0q-.31-.09-.63-.15a8.83 8.83 0 0 0-1-.16c-.33 0-.66-.05-1-.05h-.88A17 17 0 0 1 52 5h.07A.93.93 0 0 1 53 5.93zM28.88 20H28c-.34 0-.67 0-1 .05a9.86 9.86 0 0 0-5.37 2.25h0c-.22.18-.42.37-.62.56V22a16.4 16.4 0 0 0-.12-2A17 17 0 0 0 11.53 6.76.92.92 0 0 1 11.93 5H12A17 17 0 0 1 28.88 20z'/%3E%3Cpath fill='%23aeadb3' d='M32 54a1 1 0 0 1-1-1V48a1 1 0 0 1 2 0v5A1 1 0 0 1 32 54zM21 22.07v.79A10 10 0 0 0 18 30v6.33a8 8 0 0 1-10.86-.41zM56.86 35.92A8 8 0 0 1 46 36.33V30a10 10 0 0 0-3-7.14v-.79z'/%3E%3Cpath fill='%233e2c27' d='M35,45.49a1.55,1.55,0,0,1-.11.56,1.49,1.49,0,0,1-.66.76L32,48l-2.23-1.19a1.49,1.49,0,0,1-.66-.76,1.55,1.55,0,0,1-.11-.56A1.44,1.44,0,0,1,30.39,44h3.22A1.44,1.44,0,0,1,35,45.49Z'/%3E%3Ccircle cx='38.5' cy='35.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='25.5' cy='35.5' r='1.5' fill='%232d2d2d'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23703f00' d='M21 51H43a0 0 0 0 1 0 0v4a6 6 0 0 1-6 6H27a6 6 0 0 1-6-6V51A0 0 0 0 1 21 51zM24 11.91A14 14 0 0 0 16.88 18a12.49 12.49 0 0 1-4-6.76L11 3a14 14 0 0 1 13 8.91z'/%3E%3Cpath fill='%23965500' d='M49,25h0a45.38,45.38,0,0,1-2.11,13.68L43,51H21L17.11,38.68A45.38,45.38,0,0,1,15,25h0a13.85,13.85,0,0,1,1.88-7A14,14,0,0,1,24,11.91,13.49,13.49,0,0,1,28.21,11L29,15h6l.79-4a13.49,13.49,0,0,1,4.17.88A14,14,0,0,1,47.12,18,13.85,13.85,0,0,1,49,25Z'/%3E%3Ccircle cx='41.5' cy='29.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='22.5' cy='29.5' r='1.5' fill='%232d2d2d'/%3E%3Cpath fill='%23703f00' d='M53,3l-1.83,8.24A12.49,12.49,0,0,1,47.12,18,14,14,0,0,0,40,11.91,14,14,0,0,1,53,3Z'/%3E%3Cpath fill='%233e2c27' d='M36.52 7.39L35.79 11 35 15H29l-.79-4-.73-3.64a2 2 0 0 1 2-2.39h5.12A2 2 0 0 1 36.52 7.39zM27 58a1 1 0 0 1-1-1V55a1 1 0 0 1 2 0v2A1 1 0 0 1 27 58zM37 58a1 1 0 0 1-1-1V55a1 1 0 0 1 2 0v2A1 1 0 0 1 37 58z'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23965500' d='M48,16.8A17.83,17.83,0,0,1,50,25V37.3a17.61,17.61,0,0,0-5-3.5V22a7,7,0,0,0-13-3.6A6.89,6.89,0,0,0,31,17.05,7,7,0,0,0,19,22V33.8a17.61,17.61,0,0,0-5,3.5V25a18,18,0,0,1,34-8.2Z'/%3E%3Cpath fill='%23efc589' d='M53,44c0,7.18-9.4,13-21,13S11,51.18,11,44c0-.22,0-.45,0-.67a3.93,3.93,0,0,1,.06-.48.64.64,0,0,1,0-.2,3,3,0,0,1,.1-.5c0-.13.06-.26.1-.39a5.44,5.44,0,0,1,.29-.86A11.25,11.25,0,0,1,14,37.33v0a17.61,17.61,0,0,1,5-3.5V22a7,7,0,0,1,12-4.95A6.89,6.89,0,0,1,32,18.4,7,7,0,0,1,45,22V33.8a17.61,17.61,0,0,1,5,3.5v0a11.25,11.25,0,0,1,2.39,3.57,5.44,5.44,0,0,1,.29.86c0,.13.07.26.11.39a4.37,4.37,0,0,1,.09.5.64.64,0,0,1,0,.2,3.93,3.93,0,0,1,.06.48C53,43.55,53,43.78,53,44Z'/%3E%3Cpath fill='%23703f00' d='M16 16.8A17.83 17.83 0 0 0 14 25v2.91A5.47 5.47 0 0 1 13 28a6 6 0 0 1 0-12A5.88 5.88 0 0 1 16 16.8zM57 22a6 6 0 0 1-6 6 5.47 5.47 0 0 1-1-.09V25a17.83 17.83 0 0 0-2-8.2 5.88 5.88 0 0 1 3-.8A6 6 0 0 1 57 22z'/%3E%3Cpath fill='%233e2c27' d='M37,48H27a1,1,0,0,1,0-2H37a1,1,0,0,1,0,2Z'/%3E%3Ccircle cx='26.5' cy='26.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='37.5' cy='26.5' r='1.5' fill='%232d2d2d'/%3E%3Cpath fill='%233e2c27' d='M30 38H29a1 1 0 0 1 0-2h1a1 1 0 0 1 0 2zM35 38H34a1 1 0 0 1 0-2h1a1 1 0 0 1 0 2z'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath fill='%23d8d9dd' d='M57,38.33C57,50.76,45.81,57,32,57S7,50.76,7,38.33a27,27,0,0,1,5.81-16,27,27,0,0,1,11.07-8.71,21,21,0,0,1,16.24,0,27,27,0,0,1,11.07,8.71A27,27,0,0,1,57,38.33Z'/%3E%3Cpath fill='%23434347' d='M23.88 13.63a27 27 0 0 0-11.07 8.71 8 8 0 1 1 11.07-8.71zM56 15a8 8 0 0 1-4.81 7.34 27 27 0 0 0-11.07-8.71A8 8 0 0 1 56 15zM18.74 40a5.66 5.66 0 0 1-5.6-7c1-4.83 7.55-8 11.21-8C31.48 25 27.4 40 18.74 40zM45.26 40a5.66 5.66 0 0 0 5.6-7c-1-4.83-7.55-8-11.21-8C32.52 25 36.6 40 45.26 40z'/%3E%3Ccircle cx='23.5' cy='30.5' r='1.5' fill='%232d2d2d'/%3E%3Ccircle cx='40.5' cy='30.5' r='1.5' fill='%232d2d2d'/%3E%3Cpath fill='%23434347' d='M32,50a1,1,0,0,1-1-1V43a1,1,0,0,1,2,0v6A1,1,0,0,1,32,50Z'/%3E%3Cpath fill='%23434347' d='M37,50H27a1,1,0,0,1,0-2H37a1,1,0,0,1,0,2Z'/%3E%3Cpath fill='%233e2c27' d='M32,43.38h0l-2.23-1.12A1.4,1.4,0,0,1,29,41h0a1.39,1.39,0,0,1,1.39-1.39h3.22A1.39,1.39,0,0,1,35,41h0a1.4,1.4,0,0,1-.77,1.24Z'/%3E%3C/svg%3E");
+    #rect {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      @for $i from 1 through 10 {
+        @for $j from 1 through 10 {
+          .row:nth-child(#{$i}) {
+            .col:nth-child(#{$j}) {
+              $random: random(10);
+              background: center /
+                contain
+                no-repeat
+                nth($animals, $random)
+                #dddddd33;
+            }
+          }
+        }
+      }
+    }
+  }
+</style>
